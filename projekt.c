@@ -494,33 +494,32 @@ void X_EventLoop()
                 {
                     if (event.xany.window == scene.button.window)
                     {
+                        printf("Button Pressed!\n");
                         E_UpdateCurrentStation(NORTH);
                         E_DrawStations();
-                        printf("Button Pressed!\n");
                     }
                     else if (event.xany.window == scene.textAreaOne.window ||
                              event.xany.window == scene.textAreaTwo.window ||
                              event.xany.window == scene.textAreaThree.window)
                     {
-                        prevSelectedWindow = selectedWindow;
-
-                        if (selectedWindow != scene.textAreaOne.window)
-                        {
-                            XClearWindow(dpy, scene.textAreaTwo.window);
-                            XDrawString(dpy, scene.textAreaTwo.window, gc, 0, 17, &selectedData[0], end);
-                            printf("Cleared\n");
-                        }
-
                         printf("Text area pressed!\n");
+
+                        // Clear all text areas
+                        XClearWindow(dpy, scene.textAreaOne.window);
+                        XDrawString(dpy, scene.textAreaOne.window, gc, 0, 17, &selectedData[0], end);
+                        XClearWindow(dpy, scene.textAreaTwo.window);
+                        XDrawString(dpy, scene.textAreaTwo.window, gc, 0, 17, &selectedData[0], end);
+                        XClearWindow(dpy, scene.textAreaThree.window);
+                        XDrawString(dpy, scene.textAreaThree.window, gc, 0, 17, &selectedData[0], end);
+
                         if (event.xany.window == scene.textAreaOne.window)
                             selectedWindow = scene.textAreaOne.window;
-
                         else if (event.xany.window == scene.textAreaTwo.window)
                             selectedWindow = scene.textAreaTwo.window;
-
                         else if (event.xany.window == scene.textAreaThree.window)
                             selectedWindow = scene.textAreaThree.window;
 
+                        // Draw cursor
                         position = event.xbutton.x / charinc;
                         current = position;
                         if (position > end)
@@ -536,9 +535,12 @@ void X_EventLoop()
                 break;
 
             case KeyPress:
+                /*
                 if (selectedWindow)
+                {
                     break;
-
+                }
+*/
                 count = XLookupString(&event.xkey, bytes, 3, &character, &xComposeStatus);
                 switch (count)
                 {
@@ -576,7 +578,7 @@ void X_EventLoop()
                                 if (bytes[0] >= 48 && bytes[0] <= 57 || bytes[0] == 45)
                                 {
                                     // Text area other than 1 and not a minus character
-                                    if (selectedWindow != scene.textAreaOne.window && bytes[0] == 45)
+                                    if ((selectedWindow != scene.textAreaOne.window) && bytes[0] == 45)
                                     {
                                         break;
                                     }
