@@ -1,11 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 
-#define true 1
-#define false 0
+#define EQUAL 0
 
 #define cursoricon_width 6
 #define cursoricon_heigth 24
@@ -40,6 +40,8 @@ enum{
 typedef struct
 {
     Window window;
+    int position, current, end;
+    char content[5];
 }
 TextArea;
 
@@ -78,9 +80,9 @@ typedef struct
     Window window;
 
     Button button;
-    TextArea textAreaOne;
-    TextArea textAreaTwo;
-    TextArea textAreaThree;
+    TextArea textArea1;
+    TextArea textArea2;
+    TextArea textArea3;
 
     XEvent event;
 
@@ -96,6 +98,7 @@ typedef struct
     char data1[30];
     char data2[30];
     char data3[30];
+    bool hasBeenUpdated;
 }
 Station;
 
@@ -105,25 +108,19 @@ typedef struct
 }
 AllStations;
 
-/* global scene */
+/* Global variables */
 Scene scene;
 
-// colors
+// Color
 int red;
 
-int count;
-int charinc, position, end, current;
+int charinc;
 
-char selectedData[4], bytes[3];
-char dataTemperature[4];
-char dataWindSpeed[4];
-char dataPressure[4];
+TextArea *selectedTextArea;
 
 KeySym character;
 XComposeStatus xComposeStatus;
 Pixmap cursor;
-
-int selectedTextArea;
 
 // Stations selectedData
 AllStations stations;
@@ -248,25 +245,6 @@ void setUpTextAreaResources()
             );
 }
 
-//not working
-void createTextArea(Window window, XSetWindowAttributes attributes, int y, int height)
-{
-    window = XCreateWindow(
-            scene.display, scene.window,
-            700, y, 220, height, 2,
-            scene.depth, InputOutput, scene.visual,
-            scene.mask, &attributes
-    );
-
-    XSelectInput(
-            scene.display, window,
-            attributes.event_mask
-    );
-
-    // display the window
-    XMapWindow(scene.display, window);
-}
-
 void X_CreateTextAreas()
 {
     setUpTextAreaResources();
@@ -279,7 +257,12 @@ void X_CreateTextAreas()
 
     int y = 170, height = 26;
 
-    scene.textAreaOne.window = XCreateWindow(
+    scene.textArea1.current = scene.textArea1.current = 0;
+    scene.textArea2.current = scene.textArea2.current = 0;
+    scene.textArea3.current = scene.textArea3.current = 0;
+
+    /* Creating all text areas */
+    scene.textArea1.window = XCreateWindow(
             scene.display, scene.window,
             700, y, 220, height, 2,
             scene.depth, InputOutput, scene.visual,
@@ -287,14 +270,14 @@ void X_CreateTextAreas()
     );
 
     XSelectInput(
-            scene.display, scene.textAreaOne.window,
+            scene.display, scene.textArea1.window,
             attributes.event_mask
     );
 
     // display the window
-    XMapWindow(scene.display, scene.textAreaOne.window);
+    XMapWindow(scene.display, scene.textArea1.window);
 
-    scene.textAreaTwo.window = XCreateWindow(
+    scene.textArea2.window = XCreateWindow(
             scene.display, scene.window,
             700, y + height * 2, 220, height, 2,
             scene.depth, InputOutput, scene.visual,
@@ -302,14 +285,14 @@ void X_CreateTextAreas()
     );
 
     XSelectInput(
-            scene.display, scene.textAreaTwo.window,
+            scene.display, scene.textArea2.window,
             attributes.event_mask
     );
 
     // display the window
-    XMapWindow(scene.display, scene.textAreaTwo.window);
+    XMapWindow(scene.display, scene.textArea2.window);
 
-    scene.textAreaThree.window = XCreateWindow(
+    scene.textArea3.window = XCreateWindow(
             scene.display, scene.window,
             700, y+ height * 4, 220, height, 2,
             scene.depth, InputOutput, scene.visual,
@@ -317,17 +300,12 @@ void X_CreateTextAreas()
     );
 
     XSelectInput(
-            scene.display, scene.textAreaThree.window,
+            scene.display, scene.textArea3.window,
             attributes.event_mask
     );
 
     // display the window
-    XMapWindow(scene.display, scene.textAreaThree.window);
-
-    //createTextArea(scene.textAreaOne.window, attributes, y, height);
-    //createTextArea(scene.textAreaTwo.window, attributes, y + height * 2, height);
-    //createTextArea(scene.textAreaThree.window, attributes, y + height * 4, height);
-
+    XMapWindow(scene.display, scene.textArea3.window);
 }
 
 void X_InitializeStations()
@@ -350,7 +328,7 @@ void X_InitializeStations()
     stations.arr[3] = stationFour;
 }
 
-void E_UpdateAllStations()
+void E_InitializeAllStationsData()
 {
     /*
     char str[stringLength] = *stations;
@@ -364,23 +342,35 @@ void E_UpdateAllStations()
 
     for (int i = 0; i < 4; i++)
     {
-        sprintf(stations.arr[i].data1, "Temperature: %s %cC", selectedData, ASCII_DEGREE);
-        sprintf(stations.arr[i].data2, "Wind speed : %s km\\h", selectedData);
-        sprintf(stations.arr[i].data3, "Pressure   : %s hPa", selectedData);
+        sprintf(stations.arr[i].data1, "Temperature: %s %cC", "14", ASCII_DEGREE);
+        sprintf(stations.arr[i].data2, "Wind speed : %s km\\h", "88");
+        sprintf(stations.arr[i].data3, "Pressure   : %s hPa", "2137");
+        stations.arr[i].hasBeenUpdated = false;
     }
-
 }
 
 void E_UpdateCurrentStation(int currentStationId)
 {
+    bool updateSuccessful = false;
     unsigned int id = currentStationId;
-    if (strlen(selectedData) > 0)
+    if (strlen(scene.textArea1.content) > 0)
     {
-        sprintf(stations.arr[id].data1, "Temperature: %s%cC", selectedData, ASCII_DEGREE);
+        sprintf(stations.arr[id].data1, "Temperature: %s%cC", scene.textArea1.content, ASCII_DEGREE);
+        updateSuccessful = true;
     }
-    //sprintf(stations.arr[id].data2, "Wind speed : %s km\\h", selectedData);
-    //sprintf(stations.arr[id].data3, "Pressure   : %s hPa", selectedData);
+    if (strlen(scene.textArea2.content) > 0)
+    {
+        sprintf(stations.arr[id].data2, "Wind speed : %s km\\h", scene.textArea2.content);
+        updateSuccessful = true;
+    }
+    if (strlen(scene.textArea3.content) > 0)
+    {
+        sprintf(stations.arr[id].data3, "Pressure   : %s hPa", scene.textArea3.content);
+        updateSuccessful = true;
+    }
 
+    if (updateSuccessful)
+        stations.arr[id].hasBeenUpdated = true;
 }
 
 void E_DrawMap()
@@ -435,7 +425,6 @@ void E_DrawStations()
         y = coordinates[i + 1];
         index = i / 2;
 
-        //XFillRectangle(dpy, drw, gc, x, y - 10, textWidth, textHeight);
         XClearArea(dpy, win, x, y, textWidth, textHeight, 0);
         XFillRectangle(dpy, drw, gc, x - 20, y - 10, 10, 10);
         XDrawString(dpy, drw, gc, x, y, stations.arr[index].name, strlen(stations.arr[index].name));
@@ -443,6 +432,26 @@ void E_DrawStations()
         XDrawString(dpy, drw, gc, x, y + vertSpace * 2, stations.arr[index].data2, strlen(stations.arr[index].data2));
         XDrawString(dpy, drw, gc, x, y + vertSpace * 3, stations.arr[index].data3, strlen(stations.arr[index].data3));
     }
+}
+
+void E_ResetStationsUpdateStatus()
+{
+    for (int i = 0; i < 4; i++)
+    {
+        stations.arr[i].hasBeenUpdated = false;
+    }
+}
+
+bool E_HasStationsDataBeenUpdated()
+{
+    for (int i = 0; i < 4; i++)
+    {
+        if (stations.arr[i].hasBeenUpdated)
+        {
+            return true;
+        }
+    }
+    return false;
 }
 
 void E_SetButtonLabel()
@@ -459,6 +468,17 @@ void E_SetButtonLabel()
     );
 }
 
+void E_ModifyTextAreaCursor(int cursorX, TextArea *textArea)
+{
+    textArea -> position = cursorX / charinc;
+    textArea -> current = textArea -> position;
+    if (textArea -> position > textArea -> end)
+    {
+        textArea -> position = textArea -> end;
+        textArea -> current = textArea -> end;
+    }
+}
+
 // Note: drawing MUST be done in the X_EventLoop() function
 void X_EventLoop()
 {
@@ -470,12 +490,17 @@ void X_EventLoop()
     GC gc = scene.gc;
     XEvent event = scene.event;
 
-
-    Window selectedWindow;
-    Window prevSelectedWindow;
-    current = end = 0;
+    int count;
+    char bytes[3];
     while (true)
     {
+        if (E_HasStationsDataBeenUpdated())
+        {
+            E_DrawStations();
+            E_ResetStationsUpdateStatus();
+            printf("Stations drawn!\n");
+        }
+        // Check if any data in stations has changed
         XNextEvent(dpy, &event);
         switch (event.type)
         {
@@ -483,7 +508,7 @@ void X_EventLoop()
                 //XSetForeground(scene.display, scene.gc, BlackPixel(scene.display, scene.screen));
 
                 E_DrawMap();
-                E_UpdateAllStations();
+                E_InitializeAllStationsData();
                 E_DrawStations();
 
                 E_SetButtonLabel();
@@ -496,109 +521,133 @@ void X_EventLoop()
                     {
                         printf("Button Pressed!\n");
                         E_UpdateCurrentStation(NORTH);
-                        E_DrawStations();
+                        //E_DrawStations();
                     }
-                    else if (event.xany.window == scene.textAreaOne.window ||
-                             event.xany.window == scene.textAreaTwo.window ||
-                             event.xany.window == scene.textAreaThree.window)
+                    else if (event.xany.window == scene.textArea1.window ||
+                             event.xany.window == scene.textArea2.window ||
+                             event.xany.window == scene.textArea3.window)
                     {
-                        printf("Text area pressed!\n");
+                        printf("Text area selected!\n");
 
                         // Clear all text areas
-                        XClearWindow(dpy, scene.textAreaOne.window);
-                        XDrawString(dpy, scene.textAreaOne.window, gc, 0, 17, &selectedData[0], end);
-                        XClearWindow(dpy, scene.textAreaTwo.window);
-                        XDrawString(dpy, scene.textAreaTwo.window, gc, 0, 17, &selectedData[0], end);
-                        XClearWindow(dpy, scene.textAreaThree.window);
-                        XDrawString(dpy, scene.textAreaThree.window, gc, 0, 17, &selectedData[0], end);
+                        XClearWindow(dpy, scene.textArea1.window);
+                        XDrawString(dpy, scene.textArea1.window, gc, 0, 17,
+                                    &scene.textArea1.content[0], scene.textArea1.end);
 
-                        if (event.xany.window == scene.textAreaOne.window)
-                            selectedWindow = scene.textAreaOne.window;
-                        else if (event.xany.window == scene.textAreaTwo.window)
-                            selectedWindow = scene.textAreaTwo.window;
-                        else if (event.xany.window == scene.textAreaThree.window)
-                            selectedWindow = scene.textAreaThree.window;
+                        XClearWindow(dpy, scene.textArea2.window);
+                        XDrawString(dpy, scene.textArea2.window, gc, 0, 17,
+                                    &scene.textArea2.content[0], scene.textArea2.end);
 
-                        // Draw cursor
-                        position = event.xbutton.x / charinc;
-                        current = position;
-                        if (position > end)
+                        XClearWindow(dpy, scene.textArea3.window);
+                        XDrawString(dpy, scene.textArea3.window, gc, 0, 17,
+                                    &scene.textArea3.content[0], scene.textArea3.end);
+
+                        if (event.xany.window == scene.textArea1.window)
                         {
-                            position = end;
-                            current = end;
+                            /*
+                            position = selectedTextArea.position;
+                            current = selectedTextArea.current;
+                            strcpy(selectedData, dataOne);
+                            memset(&selectedData, 0, sizeof(selectedData));
+                            */
+                            selectedTextArea = &scene.textArea1;
                         }
-                        XClearWindow(dpy, selectedWindow);
-                        XCopyArea(dpy, cursor, selectedWindow, gc, 0, 0, 6, 24, position * charinc, 2);
-                        XDrawString(dpy, selectedWindow, gc, 0, 17, &selectedData[0], end);
+                        else if (event.xany.window == scene.textArea2.window)
+                        {
+                            selectedTextArea = &scene.textArea2;
+                        }
+                        else if (event.xany.window == scene.textArea3.window)
+                        {
+                            selectedTextArea = &scene.textArea3;
+                        }
+
+                        // Modify text area cursor values
+                        selectedTextArea -> position = event.xbutton.x / charinc;
+                        selectedTextArea -> current = selectedTextArea -> position;
+                        if (selectedTextArea -> position > selectedTextArea -> end)
+                        {
+                            selectedTextArea -> position = selectedTextArea -> end;
+                            selectedTextArea -> current = selectedTextArea -> end;
+                        }
+
+                        // Draw cursor in mouse click position
+                        XCopyArea(dpy, cursor, selectedTextArea -> window, gc, 0, 0, 6, 24,
+                                selectedTextArea -> position * charinc, 2);
                     }
                 }
                 break;
 
             case KeyPress:
-                /*
-                if (selectedWindow)
+                if (selectedTextArea == &scene.textArea1 ||
+                    selectedTextArea == &scene.textArea2 ||
+                    selectedTextArea == &scene.textArea3)
                 {
-                    break;
-                }
-*/
-                count = XLookupString(&event.xkey, bytes, 3, &character, &xComposeStatus);
-                switch (count)
-                {
-                    case 0: // Control character
-                        break;
+                    //int current = selectedTextArea -> current;
+                    count = XLookupString(&event.xkey, bytes, 3, &character, &xComposeStatus);
+                    switch (count)
+                    {
+                        case 0: // Control character
+                            break;
 
-                    case 1: // Printable Character
-                        switch (bytes[0])
-                        {
-                            case 8: // Backspace
-                                if (current - 1 >= 0)
-                                    current--;
+                        case 1: // Printable Character
+                            switch (bytes[0])
+                            {
+                                case 8: // Backspace
+                                    if (selectedTextArea -> current - 1 >= 0)
+                                        selectedTextArea -> current--;
 
-                                XClearWindow(dpy, selectedWindow);
-                                XCopyArea(dpy, cursor, selectedWindow, gc, 0, 0, 6, 24, current * charinc, 2);
+                                    XClearWindow(dpy, selectedTextArea -> window);
+                                    XCopyArea(dpy, cursor, selectedTextArea -> window, gc, 0, 0, 6, 24,
+                                              selectedTextArea -> current * charinc, 2);
 
-                                for (int i = current; i < end; i++)
-                                    selectedData[i] = selectedData[i + 1];
+                                    for (int i = selectedTextArea -> current; i < selectedTextArea -> end; i++)
+                                        selectedTextArea -> content[i] = selectedTextArea -> content[i + 1];
 
-                                if (end - 1 >= 0)
-                                    end--;
+                                    if (selectedTextArea -> end - 1 >= 0)
+                                        selectedTextArea -> end--;
 
-                                XDrawString(dpy, selectedWindow, gc, 0, 17, &selectedData[0], end);
-                                if (current < 1)
+                                    XDrawString(dpy, selectedTextArea -> window, gc, 0, 17,
+                                                &selectedTextArea -> content[0], selectedTextArea -> end);
+                                    if (selectedTextArea -> current < 1)
+                                        XBell(dpy, 30);
+                                    break;
+
+                                case 13: // Enter
                                     XBell(dpy, 30);
+                                    break;
 
-                                break;
-
-                            case 13: // Enter
-                                XBell(dpy, 30);
-                                break;
-
-                            default: // Any other printable character
-                                // Digits or minus character
-                                if (bytes[0] >= 48 && bytes[0] <= 57 || bytes[0] == 45)
-                                {
-                                    // Text area other than 1 and not a minus character
-                                    if ((selectedWindow != scene.textAreaOne.window) && bytes[0] == 45)
+                                default: // Any other printable character
+                                    // Digits or minus character
+                                    if (bytes[0] >= 48 && bytes[0] <= 57 || bytes[0] == 45)
                                     {
-                                        break;
+                                        // Text area other than 1 and not a minus character
+                                        if ((selectedTextArea -> window != scene.textArea1.window) && bytes[0] == 45)
+                                            break;
+
+                                        // Input limit
+                                        if (selectedTextArea -> end >= sizeof(selectedTextArea -> content) - 1)
+                                        {
+                                            printf("Character limit of %lu reached!\n",
+                                                    sizeof(selectedTextArea -> content));
+                                            break;
+                                        }
+                                        selectedTextArea -> end++;
+                                        for (int i = selectedTextArea -> end; i > selectedTextArea -> current; i--)
+                                            selectedTextArea->content[i] = selectedTextArea->content[i - 1];
+
+                                        selectedTextArea -> content[selectedTextArea -> current] = bytes[0];
+                                        selectedTextArea -> current++;
+
+                                        XClearWindow(dpy, selectedTextArea -> window);
+                                        XCopyArea(dpy, cursor, selectedTextArea -> window, gc, 0, 0, 6, 24,
+                                                  selectedTextArea -> current * charinc, 2);
+                                        XDrawString(dpy, selectedTextArea -> window, gc, 0, 17,
+                                                    &selectedTextArea -> content[0], selectedTextArea -> end);
                                     }
-
-                                    end++;
-                                    for (int i = end; i > current; i--)
-                                        selectedData[i] = selectedData[i - 1];
-
-                                    selectedData[current] = bytes[0];
-                                    current++;
-
-                                    XClearWindow(dpy, selectedWindow);
-                                    XCopyArea(dpy, cursor, selectedWindow, gc, 0, 0, 6, 24, current * charinc,
-                                              2);
-                                    XDrawString(dpy, selectedWindow, gc, 0, 17, &selectedData[0], end);
-                                }
-                                break;
-                        }
-                        printf("selectedData: %s\n", &selectedData[0]);
-                        break;
+                                    break;
+                            }
+                            break;
+                    }
                 }
         }
 #pragma clang diagnostic pop
