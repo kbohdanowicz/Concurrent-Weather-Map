@@ -10,13 +10,13 @@
 
 #define KEY 1234
 
-#define cursoricon_width 6
-#define cursoricon_heigth 24
+#define CURSOR_ICON_WIDTH 6
+#define CURSOR_ICON_HEIGHT 24
 
 #define ASCII_DEGREE 176
 
-// cursor shape
-static unsigned char cursoricon_bits[] =
+// Cursor shape
+static char cursoricon_bits[] =
 {
         0x21, 0x1e, 0x0c, 0x0c, 0x0c, 0x0c, 0x0c, 0x0c, 0x0c, 0x0c, 0x0c, 0x0c,
         0x0c, 0x0c, 0x0c, 0x0c, 0x0c, 0x0c, 0x0c, 0x0c, 0x0c, 0x0c, 0x1e, 0x21
@@ -28,7 +28,7 @@ enum
 {
     WIN_X = 100,
     WIN_Y = 500,
-    WIN_WIDTH = 1000,
+    WIN_WIDTH = 1200,
     WIN_HEIGHT = 800,
     WIN_BORDER = 1
 };
@@ -54,7 +54,8 @@ typedef struct
     Window window;
     Window rootWindow;
 
-    int x, y, width, height;
+    int x, y;
+    unsigned int width, height;
     unsigned int border_width;
     unsigned int depth;
 
@@ -129,9 +130,10 @@ AllStations *allStations;
 int allStationsId;
 
 int currentStationId;
+
 /* FUNCTIONS */
 
-// NAMING CONVENTIONS:
+/* NAMING CONVENTIONS: */
 //   camelCase - function to use in X or E function
 //   X_PascalCase - main function
 //   E_PascalCase - function to use in X_EventLoop() function
@@ -213,7 +215,7 @@ void X_CreateButton()
 {
     scene.button.window = XCreateSimpleWindow(
             scene.display, scene.window,
-            WIN_WIDTH - 200, 100, 50, 25, WIN_BORDER,
+            890, 100, 50, 25, WIN_BORDER,
             BlackPixel(scene.display, scene.screen), scene.color_gray.pixel
     );
 
@@ -222,10 +224,10 @@ void X_CreateButton()
             ButtonPressMask
     );
 
-    // display the buttonWindow
+    // display the button
     XMapWindow(scene.display, scene.button.window);
 
-    // center text?
+    // center text
     XGetGeometry(
             scene.display, scene.button.window, &scene.button.rootWindow,
             &scene.button.x, &scene.button.y, &scene.button.width, &scene.button.height,
@@ -242,10 +244,28 @@ void setUpTextAreaResources()
 
     cursor = XCreatePixmapFromBitmapData(
             scene.display, scene.window,
-            cursoricon_bits, cursoricon_width, cursoricon_heigth,
+            cursoricon_bits, CURSOR_ICON_WIDTH, CURSOR_ICON_HEIGHT,
             red, WhitePixel(scene.display, scene.screen),
             scene.depth
             );
+}
+
+void E_DrawTextAreaLabels()
+{
+    Display *dpy = scene.display;
+    Drawable drw = scene.drawable;
+    GC gc = scene.gc;
+
+    char *firstLabel = "Temperature: ";
+    char *secondLabel = "Wind speed: ";
+    char *thirdLabel = "Pressure: ";
+
+    int x = 790, y = 170 + 20, height = 26;
+
+    /* Drawing labels */
+    XDrawString(dpy, drw, gc, x - 80, y, firstLabel, strlen(firstLabel));
+    XDrawString(dpy, drw, gc, x - 73, y + height * 2, secondLabel, strlen(secondLabel));
+    XDrawString(dpy, drw, gc, x - 60, y + height * 4, thirdLabel, strlen(thirdLabel));
 }
 
 void X_CreateTextAreas()
@@ -258,7 +278,7 @@ void X_CreateTextAreas()
     attributes.background_pixel = WhitePixel(scene.display, scene.screen);
     attributes.event_mask = ButtonPressMask;
 
-    int y = 170, height = 26;
+    int x = 800, y = 170, height = 26;
 
     scene.textArea1.current = 0;
     scene.textArea2.current = 0;
@@ -267,7 +287,7 @@ void X_CreateTextAreas()
     /* Creating all text areas */
     scene.textArea1.window = XCreateWindow(
             scene.display, scene.window,
-            700, y, 220, height, 2,
+            x, y, 220, height, 2,
             scene.depth, InputOutput, scene.visual,
             scene.mask, &attributes
     );
@@ -282,7 +302,7 @@ void X_CreateTextAreas()
 
     scene.textArea2.window = XCreateWindow(
             scene.display, scene.window,
-            700, y + height * 2, 220, height, 2,
+            x, y + height * 2, 220, height, 2,
             scene.depth, InputOutput, scene.visual,
             scene.mask, &attributes
     );
@@ -297,7 +317,7 @@ void X_CreateTextAreas()
 
     scene.textArea3.window = XCreateWindow(
             scene.display, scene.window,
-            700, y+ height * 4, 220, height, 2,
+            x, y + height * 4, 220, height, 2,
             scene.depth, InputOutput, scene.visual,
             scene.mask, &attributes
     );
@@ -328,7 +348,6 @@ void E_UpdateCurrentStation()
     }
 }
 
-//TODO LATER automate with for and array of coordinates
 void E_DrawMap()
 {
     /*
@@ -361,9 +380,9 @@ void E_DrawMap()
     XDrawLine(scene.display, scene.window, scene.gc, 250,  25, 380,  40);
     XDrawLine(scene.display, scene.window, scene.gc, 380,  40, 540,  30);
     XDrawLine(scene.display, scene.window, scene.gc, 540,  30, 610, 120);
-    XDrawLine(scene.display, scene.window, scene.gc, 610, 120, 600, 200);
-    XDrawLine(scene.display, scene.window, scene.gc, 600, 200, 600, 380);
-    XDrawLine(scene.display, scene.window, scene.gc, 600, 380, 570, 600);
+    XDrawLine(scene.display, scene.window, scene.gc, 610, 120, 625, 200);
+    XDrawLine(scene.display, scene.window, scene.gc, 625, 200, 630, 380);
+    XDrawLine(scene.display, scene.window, scene.gc, 630, 380, 570, 600);
     XDrawLine(scene.display, scene.window, scene.gc, 570, 600, 520, 700);
     XDrawLine(scene.display, scene.window, scene.gc, 520, 700, 470, 750);
     XDrawLine(scene.display, scene.window, scene.gc, 470, 750, 370, 760);
@@ -404,6 +423,32 @@ void E_DisplayStationsData()
         x = coordinates[i];
         y = coordinates[i + 1];
         index = i / 2;
+
+        printf("[DEV]: Current station id: %d\n",  currentStationId);
+
+        // draw circle around current station and draw information label
+        if (index == currentStationId)
+        {
+            XDrawArc(dpy, drw, gc, x - 26, y - 15, 21, 21, 0, 360 * 64);
+            char currentStationLabel[26];
+
+            switch (index)
+            {
+                case 0:
+                    sprintf(currentStationLabel, "Current station: Northern");
+                    break;
+                case 1:
+                    sprintf(currentStationLabel, "Current station: Southern");
+                    break;
+                case 2:
+                    sprintf(currentStationLabel, "Current station: Western");
+                    break;
+                case 3:
+                    sprintf(currentStationLabel, "Current station: Eastern");
+                    break;
+            }
+            XDrawString(dpy, drw, gc, 825, 55, currentStationLabel, strlen(currentStationLabel));
+        }
 
         XClearArea(dpy, win, x, y, textWidth, textHeight, 0);
         XFillRectangle(dpy, drw, gc, x - 20, y - 10, 10, 10);
@@ -496,14 +541,19 @@ void X_InitSharedMemory()
 
         initializeStations();
 
-        printf("[DEV]: First client\n");
+        printf("You are the first client!\n");
     }
     else
     {
         allStationsId = shmget(KEY, sizeof(AllStations), 0666 | IPC_CREAT);
         allStations = (AllStations*) shmat(allStationsId, 0, 0);
-        printf("[DEV]: Next client\n");
+        printf("You are the next client!\n");
     }
+}
+
+void E_DrawCircleAroundCurrentStation()
+{
+
 }
 
 void E_ClearSharedMemoryAndExit()
@@ -533,12 +583,11 @@ void X_EventLoop()
         switch (event.type)
         {
             case Expose:
-                //XSetForeground(scene.display, scene.gc, BlackPixel(scene.display, scene.screen));
-
                 E_DrawMap();
                 E_DisplayStationsData();
-
+                E_DrawTextAreaLabels();
                 E_SetButtonLabel();
+
                 break;
 
             case ButtonPress:
@@ -546,14 +595,14 @@ void X_EventLoop()
                 {
                     if (event.xany.window == scene.button.window)
                     {
-                        printf("Button Pressed!\n");
+                        printf("[DEV]: Button Pressed!\n");
                         E_UpdateCurrentStation();
                     }
                     else if (event.xany.window == scene.textArea1.window ||
                              event.xany.window == scene.textArea2.window ||
                              event.xany.window == scene.textArea3.window)
                     {
-                        printf("Text area selected!\n");
+                        printf("[DEV]: Text area selected!\n");
 
                         E_ClearAllTextAreas();
 
@@ -593,7 +642,7 @@ void X_EventLoop()
                     {
                         E_ClearAllTextAreas();
                         selectedTextArea = NULL;
-                        printf("Background selected!\n");
+                        printf("[DEV]: Background selected!\n");
                     }
                 }
                 break;
@@ -654,7 +703,7 @@ void X_EventLoop()
                                         // Input limit
                                         if (selectedTextArea -> end >= sizeof(selectedTextArea -> content) - 1)
                                         {
-                                            printf("Character limit of %lu reached!\n",
+                                            printf("[DEV]: Character limit of %lu reached!\n",
                                                     sizeof(selectedTextArea -> content));
                                             break;
                                         }
@@ -716,6 +765,8 @@ int main(int argc, char *argv[])
         currentStationId = 3;
     else
         printErrorAndExit("Wrong station ID");
+
+    printf("[DEV]: %d\n",  currentStationId);
 
     X_CreateScene();
     X_SetUpFont();
